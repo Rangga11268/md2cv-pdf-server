@@ -61,6 +61,7 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
             color: #000000;
             margin: 0 0 2px 0;
             line-height: 1.2;
+            font-weight: bold !important;
         }
 
         .contact-links a {
