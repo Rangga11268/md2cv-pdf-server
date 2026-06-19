@@ -181,18 +181,7 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 `;
 };
 
-// ─── Marked Custom Renderer ───────────────────────────────────────────────────
-const renderer = new marked.Renderer();
-renderer.paragraph = function ({ tokens }) {
-    const text = this.parser.parseInline(tokens);
-    if (text.includes('@') && text.includes('|')) {
-        return `<p class="contact-details">${text}</p>`;
-    }
-    if (text.includes('href') && text.includes('|')) {
-        return `<p class="contact-links">${text}</p>`;
-    }
-    return `<p>${text}</p>`;
-};
+// Custom renderer instantiated inside handler for request safety
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -243,8 +232,31 @@ app.post('/convert', async (req, res) => {
             }
         );
 
+        // Setup custom marked renderer dynamically for request statelessness
+        let hasPassedFirstHeading = false;
+        const requestRenderer = new marked.Renderer();
+
+        requestRenderer.heading = function({ tokens, depth }) {
+            hasPassedFirstHeading = true;
+            const text = this.parser.parseInline(tokens);
+            return `<h${depth}>${text}</h${depth}>`;
+        };
+
+        requestRenderer.paragraph = function({ tokens }) {
+            const text = this.parser.parseInline(tokens);
+            if (!hasPassedFirstHeading) {
+                if (text.includes('@') && text.includes('|')) {
+                    return `<p class="contact-details">${text}</p>`;
+                }
+                if (text.includes('href') && text.includes('|')) {
+                    return `<p class="contact-links">${text}</p>`;
+                }
+            }
+            return `<p>${text}</p>`;
+        };
+
         // Convert Markdown → HTML
-        const rawHtml = marked.parse(markdown, { renderer, gfm: true, breaks: false });
+        const rawHtml = marked.parse(markdown, { renderer: requestRenderer, gfm: true, breaks: false });
         const fullHtml = htmlTemplate({ bodyContent: rawHtml, fontFamily, fontSize, lineHeight, marginTB, marginLR, headingColor });
 
         // Launch Puppeteer
