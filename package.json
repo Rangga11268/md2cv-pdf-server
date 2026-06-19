@@ -2,6 +2,7 @@
   "name": "md2cv-pdf-server",
   "version": "1.0.0",
   "description": "Standalone PDF generation server for MD2CV using Puppeteer",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
