@@ -11,33 +11,52 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // ─── HTML Template ────────────────────────────────────────────────────────────
-const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB, marginLR, headingColor }) => `
+const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB, marginLR, headingColor }) => {
+    // Map font family parameter to clean Google Fonts equivalent if matched
+    let cssFontFamily = fontFamily;
+    const lowerFont = fontFamily.toLowerCase();
+    if (lowerFont.includes('arial')) {
+        cssFontFamily = '"Arimo", "Arial", "Helvetica", sans-serif';
+    } else if (lowerFont.includes('inter')) {
+        cssFontFamily = '"Inter", sans-serif';
+    } else if (lowerFont.includes('times new roman') || lowerFont.includes('times')) {
+        cssFontFamily = '"Tinos", "Times New Roman", "Times", serif';
+    } else if (lowerFont.includes('georgia')) {
+        cssFontFamily = '"Merriweather", "Georgia", serif';
+    }
+
+    return `
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <title>Resume</title>
+    <!-- Import Google Fonts for standard, high-fidelity rendering of styles across platforms -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
     <style>
         @page {
             size: A4;
-            margin: ${marginTB}cm ${marginLR}cm ${marginTB}cm ${marginLR}cm;
+            margin: ${marginTB}cm ${marginLR}cm;
         }
         
         * { box-sizing: border-box; }
 
         body {
-            font-family: ${fontFamily};
+            font-family: ${cssFontFamily};
             color: #000000;
             line-height: ${lineHeight};
             margin: 0;
             padding: 0;
             font-size: ${fontSize}pt;
             background-color: #ffffff;
+            -webkit-font-smoothing: antialiased;
         }
 
         h1 {
-            font-size: 1.75em;
-            font-weight: bold;
+            font-size: 1.8em;
+            font-weight: 700 !important;
             text-transform: uppercase;
             margin: 0 0 2px 0;
             color: ${headingColor};
@@ -48,7 +67,7 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
         .job-title {
             text-align: center;
             font-size: 1.1em;
-            font-weight: bold;
+            font-weight: 700 !important;
             letter-spacing: 0.5px;
             margin: 0 0 4px 0;
             color: ${headingColor};
@@ -61,7 +80,7 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
             color: #000000;
             margin: 0 0 2px 0;
             line-height: 1.2;
-            font-weight: bold !important;
+            font-weight: 700 !important;
         }
 
         .contact-links a {
@@ -71,11 +90,11 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 
         h2 {
             font-size: 1.1em;
-            font-weight: bold;
+            font-weight: 700 !important;
             color: ${headingColor};
             border-bottom: 1.5px solid ${headingColor};
             padding-bottom: 1px;
-            margin-top: 10px;
+            margin-top: 12px;
             margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -84,10 +103,10 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 
         h3 {
             font-size: 1em;
-            font-weight: bold;
+            font-weight: 700 !important;
             color: #000000;
-            margin-top: 5px;
-            margin-bottom: 1px;
+            margin-top: 6px;
+            margin-bottom: 2px;
             page-break-after: avoid;
         }
 
@@ -109,13 +128,13 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 
         .flex-row strong {
             font-size: 1em;
-            font-weight: bold;
+            font-weight: 700 !important;
             color: #000000;
         }
 
         .flex-row em {
             font-size: 1em;
-            font-style: italic;
+            font-style: italic !important;
             color: #000000;
         }
 
@@ -133,7 +152,7 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
         }
 
         h3 + p {
-            font-style: italic;
+            font-style: italic !important;
             color: #000000;
             font-size: 0.95em;
             margin-top: 0px;
@@ -151,8 +170,8 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
             text-decoration: none;
         }
 
-        strong { font-weight: bold; }
-        em { font-style: italic; }
+        strong, b { font-weight: 700 !important; }
+        em, i { font-style: italic !important; }
     </style>
 </head>
 <body>
@@ -160,12 +179,12 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 </body>
 </html>
 `;
+};
 
 // ─── Marked Custom Renderer ───────────────────────────────────────────────────
 const renderer = new marked.Renderer();
-renderer.paragraph = function (token) {
-    const rawText = token.text || token.raw || '';
-    const text = rawText ? marked.parseInline(rawText) : '';
+renderer.paragraph = function ({ tokens }) {
+    const text = this.parser.parseInline(tokens);
     if (text.includes('@') && text.includes('|')) {
         return `<p class="contact-details">${text}</p>`;
     }
@@ -197,11 +216,21 @@ app.post('/convert', async (req, res) => {
         marginLR     = marginLR     || '1.2';
         headingColor = headingColor || '#000000';
 
-        // Pre-process: Name heading + Job Title
-        markdown = markdown.replace(
-            /^#\s+([^\r\n]+)\s*[\r\n]+\*\*([^\r\n]+)\*\*/m,
-            (match, name, title) => `<h1>${name}</h1>\n<div class="job-title">${title}</div>`
-        );
+        // Check if input is a letter or CV (CV has bold subtitle)
+        const isCV = markdown.includes('\n**');
+
+        // Pre-process: Name heading + Job Title (CV) or just Name heading (Letter)
+        if (isCV) {
+            markdown = markdown.replace(
+                /^#\s+([^\r\n]+)\s*[\r\n]+\*\*([^\r\n]+)\*\*/m,
+                (match, name, title) => `<h1>${name}</h1>\n<div class="job-title">${title}</div>`
+            );
+        } else {
+            markdown = markdown.replace(
+                /^#\s+([^\r\n]+)/m,
+                (match, name) => `<h1>${name}</h1>`
+            );
+        }
 
         // Pre-process: **Title** + *Date* → flex-row
         markdown = markdown.replace(
