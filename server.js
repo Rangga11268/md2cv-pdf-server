@@ -163,8 +163,8 @@ const htmlTemplate = ({ bodyContent, fontFamily, fontSize, lineHeight, marginTB,
 
 // ─── Marked Custom Renderer ───────────────────────────────────────────────────
 const renderer = new marked.Renderer();
-renderer.paragraph = function ({ tokens }) {
-    const text = this.parser.parseInline(tokens);
+renderer.paragraph = function (token) {
+    const text = this.parser.parseInline(token.tokens);
     if (text.includes('@') && text.includes('|')) {
         return `<p class="contact-details">${text}</p>`;
     }
